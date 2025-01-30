@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/Database.php';
 
+session_start();
 $db = Database::getInstance();
 $error = $success = '';
 
@@ -32,8 +33,58 @@ while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Wallet</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .toast {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            padding: 1rem;
+            background: #4CAF50;
+            color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
+    <?php if (isset($_SESSION['transaction_success'])): ?>
+        <div id="toast" class="toast">
+            Successfully added <?php echo htmlspecialchars($_SESSION['transaction_type']); ?>: 
+            $<?php echo number_format($_SESSION['transaction_amount'], 2); ?>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const toast = document.getElementById('toast');
+                toast.style.display = 'block';
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.5s ease-out';
+                    setTimeout(() => {
+                        toast.remove();
+                    }, 500);
+                }, 3000);
+            });
+        </script>
+        <?php
+        // Clear the session variables
+        unset($_SESSION['transaction_success']);
+        unset($_SESSION['transaction_type']);
+        unset($_SESSION['transaction_amount']);
+        ?>
+    <?php endif; ?>
     <div class="container mx-auto px-4 py-8">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-gray-800">Personal Wallet</h1>

@@ -4,51 +4,65 @@ require_once __DIR__ . '/includes/Database.php';
 $db = Database::getInstance();
 $error = $success = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $amount = filter_input(INPUT_POST, 'amount', FILTER_VALIDATE_FLOAT);
-    $description = trim($_POST['description'] ?? '');
-    $category = trim($_POST['category'] ?? '');
-    $date = trim($_POST['date'] ?? '');
-
-    if (!$amount) {
-        $error = 'Please enter a valid amount';
-    } elseif (empty($description)) {
-        $error = 'Please enter a description';
-    } elseif (empty($category)) {
-        $error = 'Please select a category';
-    } elseif (empty($date)) {
-        $error = 'Please select a date';
-    } else {
-        try {
-            $db->query(
-                'INSERT INTO transactions (amount, description, category, transaction_date) VALUES (:amount, :description, :category, :date)',
-                [
-                    ':amount' => $amount,
-                    ':description' => $description,
-                    ':category' => $category,
-                    ':date' => $date
-                ]
-            );
-            $success = 'Transaction added successfully!';
-            // Clear form after successful submission
-            $_POST = [];
-        } catch (Exception $e) {
-            $error = 'Error adding transaction: ' . $e->getMessage();
-        }
-    }
-}
-
 // Define categories
-$categories = [
+$expense_categories = [
     'Food & Dining',
     'Transportation',
     'Shopping',
     'Bills & Utilities',
     'Entertainment',
     'Health',
-    'Income',
     'Other'
 ];
+
+$income_categories = [
+    'Salary',
+    'Refunds',
+    'Gifts',
+    'Child Support'
+];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $amount = filter_input(INPUT_POST, 'amount', FILTER_VALIDATE_FLOAT);
+    $description = trim($_POST['description'] ?? '');
+    $category = trim($_POST['category'] ?? '');
+    $date = trim($_POST['date'] ?? '');
+    $type = trim($_POST['type'] ?? 'expense');
+
+    if (!$amount) {
+        $error = 'Please enter a valid amount';
+    } elseif (empty($category)) {
+        $error = 'Please select a category';
+    } elseif (empty($date)) {
+        $error = 'Please select a date';
+    } else {
+        try {
+            // Convert amount to negative if it's an expense
+            $finalAmount = $type === 'expense' ? -abs($amount) : abs($amount);
+            
+            $db->query(
+                'INSERT INTO transactions (amount, description, category, transaction_date) VALUES (:amount, :description, :category, :date)',
+                [
+                    ':amount' => $finalAmount,
+                    ':description' => $description,
+                    ':category' => $category,
+                    ':date' => $date
+                ]
+            );
+            
+            // Store success message in session
+            session_start();
+            $_SESSION['transaction_success'] = true;
+            $_SESSION['transaction_type'] = $type;
+            $_SESSION['transaction_amount'] = abs($amount);
+            
+            header('Location: index.php');
+            exit;
+        } catch (Exception $e) {
+            $error = 'Error adding transaction: ' . $e->getMessage();
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -80,20 +94,30 @@ $categories = [
         <div class="bg-white rounded-lg shadow-md p-6">
             <form method="POST" class="space-y-4">
                 <div>
-                    <label for="amount" class="block text-sm font-medium text-gray-700">Amount</label>
-                    <input type="number" step="0.01" name="amount" id="amount" 
-                           value="<?php echo htmlspecialchars($_POST['amount'] ?? ''); ?>"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                           required>
-                    <p class="mt-1 text-sm text-gray-500">Use negative numbers for expenses, positive for income</p>
+                    <label for="type" class="block text-sm font-medium text-gray-700">Transaction Type</label>
+                    <select name="type" id="type"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            onchange="updateCategories(this.value)"
+                            required>
+                        <option value="expense" <?php echo (isset($_POST['type']) && $_POST['type'] === 'expense') ? 'selected' : ''; ?>>Expense</option>
+                        <option value="income" <?php echo (isset($_POST['type']) && $_POST['type'] === 'income') ? 'selected' : ''; ?>>Income</option>
+                    </select>
                 </div>
 
                 <div>
-                    <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
-                    <input type="text" name="description" id="description"
-                           value="<?php echo htmlspecialchars($_POST['description'] ?? ''); ?>"
+                    <label for="amount" class="block text-sm font-medium text-gray-700">Amount</label>
+                    <input type="number" inputmode="decimal" step="0.01" name="amount" id="amount" 
+                           value="<?php echo htmlspecialchars($_POST['amount'] ?? ''); ?>"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                            required>
+                    <p class="mt-1 text-sm text-gray-500">Enter a positive number - the type selection above will determine if it's an expense or income</p>
+                </div>
+
+                <div>
+                    <label for="description" class="block text-sm font-medium text-gray-700">Description (Optional)</label>
+                    <input type="text" name="description" id="description"
+                           value="<?php echo htmlspecialchars($_POST['description'] ?? ''); ?>"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                 </div>
 
                 <div>
@@ -102,8 +126,14 @@ $categories = [
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                             required>
                         <option value="">Select a category</option>
-                        <?php foreach ($categories as $cat): ?>
-                            <option value="<?php echo htmlspecialchars($cat); ?>"
+                        <?php foreach ($expense_categories as $cat): ?>
+                            <option value="<?php echo htmlspecialchars($cat); ?>" data-type="expense"
+                                    <?php echo (isset($_POST['category']) && $_POST['category'] === $cat) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($cat); ?>
+                            </option>
+                        <?php endforeach; ?>
+                        <?php foreach ($income_categories as $cat): ?>
+                            <option value="<?php echo htmlspecialchars($cat); ?>" data-type="income" style="display: none;"
                                     <?php echo (isset($_POST['category']) && $_POST['category'] === $cat) ? 'selected' : ''; ?>>
                                 <?php echo htmlspecialchars($cat); ?>
                             </option>
@@ -128,5 +158,31 @@ $categories = [
             </form>
         </div>
     </div>
+    <script>
+        function updateCategories(type) {
+            const categorySelect = document.getElementById('category');
+            const options = categorySelect.options;
+            
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                if (option.value === '') continue; // Skip the placeholder option
+                
+                if (option.dataset.type === type) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
+            }
+            
+            // Reset selection
+            categorySelect.value = '';
+        }
+        
+        // Initialize categories based on current type
+        document.addEventListener('DOMContentLoaded', function() {
+            const typeSelect = document.getElementById('type');
+            updateCategories(typeSelect.value);
+        });
+    </script>
 </body>
 </html>
