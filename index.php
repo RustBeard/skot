@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/Database.php';
-require_once __DIR__ . '/includes/ExpenseCategories.php';
-require_once __DIR__ . '/includes/IncomeCategories.php';
+require_once __DIR__ . '/includes/Categories.php';
 
 session_start();
 $db = Database::getInstance();
@@ -131,9 +130,9 @@ while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
                         
                         if (is_numeric($categoryId)) {
                             if ($isExpense) {
-                                $categoryName = ExpenseCategories::getCategoryPath($categoryId) ?? $categoryId;
+                                $categoryName = Categories::getCategoryPath($categoryId) ?? $categoryId;
                             } else {
-                                $categoryName = IncomeCategories::getCategoryPath($categoryId) ?? $categoryId;
+                                $categoryName = Categories::getCategoryPath($categoryId) ?? $categoryId;
                             }
                         }
                         ?>

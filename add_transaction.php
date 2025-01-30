@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/Database.php';
-require_once __DIR__ . '/includes/ExpenseCategories.php';
-require_once __DIR__ . '/includes/IncomeCategories.php';
+require_once __DIR__ . '/includes/Categories.php';
 
 $db = Database::getInstance();
 $error = $success = '';
@@ -111,27 +110,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <option value="">Select a category</option>
                         <?php
                         // Add expense categories
-                        $expenseCategories = ExpenseCategories::getAllCategories();
+                        $expenseCategories = Categories::getExpenseCategories();
                         foreach ($expenseCategories as $categoryId => $category) {
-                            echo '<optgroup label="' . htmlspecialchars($category['name']) . '" data-type="expense">';
-                            foreach ($category['subcategories'] as $subId => $subName) {
-                                $selected = (isset($_POST['category']) && $_POST['category'] == $subId) ? ' selected' : '';
-                                echo '<option value="' . $subId . '" data-type="expense"' . $selected . '>' 
-                                    . htmlspecialchars($subName) . '</option>';
+                            if (isset($category['subcategories'])) {
+                                // If category has subcategories, create an optgroup
+                                echo '<optgroup label="' . htmlspecialchars($category['name']) . '" data-type="expense">';
+                                foreach ($category['subcategories'] as $subId => $subName) {
+                                    $selected = (isset($_POST['category']) && $_POST['category'] == $subId) ? ' selected' : '';
+                                    echo '<option value="' . $subId . '" data-type="expense"' . $selected . '>' 
+                                        . htmlspecialchars($subName) . '</option>';
+                                }
+                                echo '</optgroup>';
+                            } else {
+                                // If category has no subcategories, add it as a direct option
+                                $selected = (isset($_POST['category']) && $_POST['category'] == $categoryId) ? ' selected' : '';
+                                echo '<option value="' . $categoryId . '" data-type="expense"' . $selected . '>' 
+                                    . htmlspecialchars($category['name']) . '</option>';
                             }
-                            echo '</optgroup>';
                         }
                         
                         // Add income categories
-                        $incomeCategories = IncomeCategories::getAllCategories();
+                        $incomeCategories = Categories::getIncomeCategories();
                         foreach ($incomeCategories as $categoryId => $category) {
-                            echo '<optgroup label="' . htmlspecialchars($category['name']) . '" data-type="income" style="display: none;">';
-                            foreach ($category['subcategories'] as $subId => $subName) {
-                                $selected = (isset($_POST['category']) && $_POST['category'] == $subId) ? ' selected' : '';
-                                echo '<option value="' . $subId . '" data-type="income"' . $selected . '>' 
-                                    . htmlspecialchars($subName) . '</option>';
-                            }
-                            echo '</optgroup>';
+                            $selected = (isset($_POST['category']) && $_POST['category'] == $categoryId) ? ' selected' : '';
+                            echo '<option value="' . $categoryId . '" data-type="income"' . $selected . ' style="display: none;">' 
+                                . htmlspecialchars($category['name']) . '</option>';
                         }
                         ?>
                     </select>
@@ -158,6 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function updateCategories(type) {
             const categorySelect = document.getElementById('category');
             const optgroups = categorySelect.getElementsByTagName('optgroup');
+            const options = categorySelect.getElementsByTagName('option');
             const firstOption = categorySelect.querySelector('option[value=""]');
             
             // Always show the "Select a category" option
@@ -165,34 +169,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 firstOption.style.display = '';
             }
             
-            // Show/hide optgroups based on type
+            // Show/hide optgroups (for expense categories)
             for (let i = 0; i < optgroups.length; i++) {
                 const optgroup = optgroups[i];
-                const options = optgroup.getElementsByTagName('option');
-                
                 if (optgroup.dataset.type === type) {
                     optgroup.style.display = '';
-                    // Show all options in this optgroup
-                    for (let j = 0; j < options.length; j++) {
-                        options[j].style.display = '';
-                    }
                 } else {
                     optgroup.style.display = 'none';
-                    // Hide all options in this optgroup
-                    for (let j = 0; j < options.length; j++) {
-                        options[j].style.display = 'none';
-                    }
                 }
             }
-            
-            // Reset selection
-            categorySelect.value = '';
+
+            // Show/hide individual options (for income categories)
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                if (option.dataset.type === type) {
+                    option.style.display = '';
+                } else if (option.dataset.type && option.dataset.type !== type) {
+                    option.style.display = 'none';
+                }
+            }
         }
-        
+
         // Initialize categories based on current type
         document.addEventListener('DOMContentLoaded', function() {
             const typeSelect = document.getElementById('type');
-            updateCategories(typeSelect.value);
+            if (typeSelect) {
+                updateCategories(typeSelect.value);
+            }
         });
     </script>
 </body>
