@@ -1,26 +1,10 @@
 <?php
 require_once __DIR__ . '/includes/Database.php';
+require_once __DIR__ . '/includes/ExpenseCategories.php';
+require_once __DIR__ . '/includes/IncomeCategories.php';
 
 $db = Database::getInstance();
 $error = $success = '';
-
-// Define categories
-$expense_categories = [
-    'Food & Dining',
-    'Transportation',
-    'Shopping',
-    'Bills & Utilities',
-    'Entertainment',
-    'Health',
-    'Other'
-];
-
-$income_categories = [
-    'Salary',
-    'Refunds',
-    'Gifts',
-    'Child Support'
-];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $amount = filter_input(INPUT_POST, 'amount', FILTER_VALIDATE_FLOAT);
@@ -110,7 +94,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                            value="<?php echo htmlspecialchars($_POST['amount'] ?? ''); ?>"
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                            required>
-                    <p class="mt-1 text-sm text-gray-500">Enter a positive number - the type selection above will determine if it's an expense or income</p>
                 </div>
 
                 <div>
@@ -126,18 +109,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                             required>
                         <option value="">Select a category</option>
-                        <?php foreach ($expense_categories as $cat): ?>
-                            <option value="<?php echo htmlspecialchars($cat); ?>" data-type="expense"
-                                    <?php echo (isset($_POST['category']) && $_POST['category'] === $cat) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($cat); ?>
-                            </option>
-                        <?php endforeach; ?>
-                        <?php foreach ($income_categories as $cat): ?>
-                            <option value="<?php echo htmlspecialchars($cat); ?>" data-type="income" style="display: none;"
-                                    <?php echo (isset($_POST['category']) && $_POST['category'] === $cat) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($cat); ?>
-                            </option>
-                        <?php endforeach; ?>
+                        <?php
+                        // Add expense categories
+                        $expenseCategories = ExpenseCategories::getAllCategories();
+                        foreach ($expenseCategories as $categoryId => $category) {
+                            echo '<optgroup label="' . htmlspecialchars($category['name']) . '" data-type="expense">';
+                            foreach ($category['subcategories'] as $subId => $subName) {
+                                $selected = (isset($_POST['category']) && $_POST['category'] == $subId) ? ' selected' : '';
+                                echo '<option value="' . $subId . '" data-type="expense"' . $selected . '>' 
+                                    . htmlspecialchars($subName) . '</option>';
+                            }
+                            echo '</optgroup>';
+                        }
+                        
+                        // Add income categories
+                        $incomeCategories = IncomeCategories::getAllCategories();
+                        foreach ($incomeCategories as $categoryId => $category) {
+                            echo '<optgroup label="' . htmlspecialchars($category['name']) . '" data-type="income" style="display: none;">';
+                            foreach ($category['subcategories'] as $subId => $subName) {
+                                $selected = (isset($_POST['category']) && $_POST['category'] == $subId) ? ' selected' : '';
+                                echo '<option value="' . $subId . '" data-type="income"' . $selected . '>' 
+                                    . htmlspecialchars($subName) . '</option>';
+                            }
+                            echo '</optgroup>';
+                        }
+                        ?>
                     </select>
                 </div>
 
@@ -161,16 +157,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script>
         function updateCategories(type) {
             const categorySelect = document.getElementById('category');
-            const options = categorySelect.options;
+            const optgroups = categorySelect.getElementsByTagName('optgroup');
+            const firstOption = categorySelect.querySelector('option[value=""]');
             
-            for (let i = 0; i < options.length; i++) {
-                const option = options[i];
-                if (option.value === '') continue; // Skip the placeholder option
+            // Always show the "Select a category" option
+            if (firstOption) {
+                firstOption.style.display = '';
+            }
+            
+            // Show/hide optgroups based on type
+            for (let i = 0; i < optgroups.length; i++) {
+                const optgroup = optgroups[i];
+                const options = optgroup.getElementsByTagName('option');
                 
-                if (option.dataset.type === type) {
-                    option.style.display = '';
+                if (optgroup.dataset.type === type) {
+                    optgroup.style.display = '';
+                    // Show all options in this optgroup
+                    for (let j = 0; j < options.length; j++) {
+                        options[j].style.display = '';
+                    }
                 } else {
-                    option.style.display = 'none';
+                    optgroup.style.display = 'none';
+                    // Hide all options in this optgroup
+                    for (let j = 0; j < options.length; j++) {
+                        options[j].style.display = 'none';
+                    }
                 }
             }
             

@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/Database.php';
+require_once __DIR__ . '/includes/ExpenseCategories.php';
+require_once __DIR__ . '/includes/IncomeCategories.php';
 
 session_start();
 $db = Database::getInstance();
@@ -118,6 +120,23 @@ while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php foreach ($transactions as $transaction): ?>
+                        <?php 
+                        $amount = $transaction['amount'];
+                        $isExpense = $amount < 0;
+                        $amountClass = $isExpense ? 'text-red-600' : 'text-green-600';
+                        
+                        // Get category display name
+                        $categoryId = $transaction['category'];
+                        $categoryName = $categoryId;
+                        
+                        if (is_numeric($categoryId)) {
+                            if ($isExpense) {
+                                $categoryName = ExpenseCategories::getCategoryPath($categoryId) ?? $categoryId;
+                            } else {
+                                $categoryName = IncomeCategories::getCategoryPath($categoryId) ?? $categoryId;
+                            }
+                        }
+                        ?>
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <?php echo htmlspecialchars($transaction['transaction_date']); ?>
@@ -126,10 +145,10 @@ while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
                                 <?php echo htmlspecialchars($transaction['description']); ?>
                             </td>
                             <td class="px-6 py-4">
-                                <?php echo htmlspecialchars($transaction['category']); ?>
+                                <?php echo htmlspecialchars($categoryName); ?>
                             </td>
-                            <td class="px-6 py-4 <?php echo $transaction['amount'] < 0 ? 'text-red-600' : 'text-green-600'; ?>">
-                                <?php echo number_format($transaction['amount'], 2); ?>
+                            <td class="px-6 py-4 <?php echo $amountClass; ?>">
+                                <?php echo number_format($amount, 2); ?>
                             </td>
                             <td class="px-6 py-4">
                                 <form method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete this transaction?');">
